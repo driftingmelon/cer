@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ceramic Works - 3D Gallery</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            background: linear-gradient(45deg, #000428, #004e92, #009ffd);
+            cursor: grab;
+        }
+
+        body.grabbing {
+            cursor: grabbing;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #title {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #00ffff;
+            font-size: 2.5em;
+            font-weight: bold;
+            letter-spacing: 5px;
+            text-transform: uppercase;
+            pointer-events: none;
+            z-index: 10;
+            text-shadow: 
+                0 0 5px #00ffff,
+                0 0 10px #00ffff,
+                0 0 20px #00ffff,
+                0 0 40px #00ffff;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 20px #00ffff; }
+            to { text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff, 0 0 30px #00ffff, 0 0 40px #00ffff; }
+        }
+
+        .nav-arrow {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(45deg, rgba(255,20,147,0.3), rgba(0,255,255,0.3));
+            border: 3px solid #ff1493;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            color: #00ffff;
+            z-index: 100;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 20px rgba(255,20,147,0.5);
+        }
+
+        .nav-arrow:hover {
+            background: linear-gradient(45deg, rgba(255,20,147,0.5), rgba(0,255,255,0.5));
+            border-color: #00ffff;
+            transform: translateY(-50%) scale(1.15);
+            box-shadow: 0 0 30px rgba(0,255,255,0.8);
+        }
+
+        #prev-arrow {
+            left: 30px;
+            border-radius: 50% 15% 15% 50%;
+        }
+
+        #next-arrow {
+            right: 30px;
+            border-radius: 15% 50% 50% 15%;
+        }
+
+        .nav-arrow.visible {
+            display: flex;
+        }
+
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #00ffff;
+            font-size: 1.5em;
+            z-index: 1000;
+            text-shadow: 0 0 10px #00ffff;
+        }
+
+        .piece-info {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #00ffff;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+            z-index: 10;
+            background: linear-gradient(45deg, rgba(0,4,40,0.9), rgba(0,78,146,0.9));
+            padding: 20px 40px;
+            border-radius: 15px;
+            backdrop-filter: blur(15px);
+            border: 2px solid #ff1493;
+            box-shadow: 0 0 30px rgba(255,20,147,0.3);
+        }
+
+        .piece-info.visible {
+            opacity: 1;
+        }
+
+        .piece-info h3 {
+            margin: 0 0 8px 0;
+            font-size: 1.6em;
+            font-weight: bold;
+            text-shadow: 0 0 10px #00ffff;
+        }
+
+        .piece-info p {
+            margin: 0;
+            font-size: 1em;
+            opacity: 0.9;
+            text-shadow: 0 0 5px #ff1493;
+        }
+
+        #controls {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            color: #00ffff;
+            font-size: 0.9em;
+            background: rgba(0,4,40,0.8);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #ff1493;
+            z-index: 10;
+            text-shadow: 0 0 5px #00ffff;
+        }
+
+        #grid-lines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0.1;
+            background-image: 
+                linear-gradient(rgba(0,255,255,0.3) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,255,255,0.3) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: grid-move 20s linear infinite;
+        }
+
+        @keyframes grid-move {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(50px, 50px); }
+        }
+    </style>
+</head>
+<body>
+    <div id="grid-lines"></div>
+    <div id="canvas-container"></div>
+    <h1 id="title">Ceramic space</h1>
+    <div id="loading">◢ Loading gallery ◣</div>
+    
+    <div id="prev-arrow" class="nav-arrow">‹</div>
+    <div id="next-arrow" class="nav-arrow">›</div>
+    
+    <div id="piece-info" class="piece-info">
+        <h3 id="piece-title"></h3>
+        <p id="piece-description"></p>
+    </div>
+
+    <div id="controls">
+        <div>🖱️ Mouse: Look around</div>
+        <div>🔄 Scroll: Zoom in/out</div>
+        <div>👆 Click: Select artwork</div>
+        <div>⬅️➡️ Navigate images</div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Gallery data
+        const galleryPieces = [
+{
+id: 1,
+title: "1",
+description: "Hand-thrown stoneware with celadon glaze",
+images: ["https://raw.githubusercontent.com/driftingmelon/cer/main/pictures/10-mysterious%20figure.jpg", "url2.jpg"]
+},
+{
+id: 2,
+title: "2",
+description: "Wheel-thrown mug with speckled white glaze",
+images: ["https://raw.githubusercontent.com/driftingmelon/cer/main/pictures/11-rock%20cylinder.jpg"]
+},
+{
+id: 3,
+title: "3",
+description: "Tall vase with natural ash glaze",
+images: ["https://raw.githubusercontent.com/driftingmelon/cer/main/pictures/2-small1.jpg"]
+},
+{
+id: 4,
+title: "4",
+description: "Flat plate with matte white glaze",
+images: ["https://raw.githubusercontent.com/driftingmelon/cer/main/pictures/3-weird%20Pair.jpg"]
+},
+{
+id: 5,
+title: "5",
+description: "Stoneware jar with carved patterns",
+images: ["https://raw.githubusercontent.com/driftingmelon/cer/main/pictures/4-bb%20tiny.jpg"]
+},
+{
+id: 6,
+title: "6",
+description: "Cup with pastel gradient glaze",
+images: ["https://raw.githubusercontent.com/driftingmelon/cer/main/pictures/5%20-coasters2.JPG","https://raw.githubusercontent.com/driftingmelon/cer/main/pictures/5%20-coasters.JPG"]
+},
+{
+id: 7,
+title: "7",
+description: "Hand-built bowl with textured surface",
+images: ["https://raw.githubusercontent.com/driftingmelon/cer/main/pictures/6-triangle%20Pair.jpg"]
+},
+{
+id: 8,
+title: "8",
+description: "Pitcher with glossy blue glaze",
+images: ["https://raw.githubusercontent.com/driftingmelon/cer/main/pictures/7-cylinder.jpg"]
+},
+{
+id: 9,
+title: "9",
+description: "Abstract ceramic sculpture",
+images: ["https://raw.githubusercontent.com/driftingmelon/cer/main/pictures/8-familyphotoof4.JPG"]
+},
+{
+id: 10,
+title: "10",
+description: "Small lidded container with satin glaze",
+images: ["https://raw.githubusercontent.com/driftingmelon/cer/main/pictures/9-skirt%20pair.JPG"]
+},
+{
+id: 11,
+title: "11",
+description: "Tile with hand-painted underglaze design",
+images: ["https://raw.githubusercontent.com/driftingmelon/cer/main/pictures/heart%20stuff1.jpg", "https://raw.githubusercontent.com/driftingmelon/cer/main/pictures/heart%20stuff2.jpg"]
+},
+{
+id: 12,
+title: "13",
+description: "Unique hand-built experimental form",
+images: ["https://raw.githubusercontent.com/driftingmelon/cer/main/pictures/13-ovalcollapsed.jpg"]
+}
+];
+
+
+        let scene, camera, renderer;
+        let imageFrames = [];
+        let selectedFrame = null;
+        let currentImageIndex = 0;
+        let raycaster, mouse;
+        let cameraTarget = new THREE.Vector3(0, 0, 0);
+        let isAnimating = false;
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        
+        // Camera controls
+        let cameraRadius = 20;
+        let cameraTheta = 0;
+        let cameraPhi = Math.PI / 2;
+        let targetTheta = 0;
+        let targetPhi = Math.PI / 2;
+        let targetRadius = 20;
+
+        // Retro elements
+        let particles, geometryParticles;
+        let retroGrid;
+
+        function init() {
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.fog = new THREE.Fog(0x000428, 10, 80);
+
+            // Camera setup
+            camera = new THREE.PerspectiveCamera(
+                75,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                1000
+            );
+
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // Enhanced lighting with retro colors
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+
+            const pointLight1 = new THREE.PointLight(0xffffff, 0.5);
+            pointLight1.position.set(15, 15, 15);
+            //pointLight1.castShadow = true;
+            scene.add(pointLight1);
+
+            const pointLight2 = new THREE.PointLight(0xffffff, 0.6);
+            pointLight2.position.set(-15, -10, 15);
+            //pointLight2.castShadow = true;
+            scene.add(pointLight2);
+
+            const spotLight = new THREE.SpotLight(0x9d4edd, 0.4);
+            //spotLight.position.set(0, 25, 0);
+            spotLight.angle = Math.PI / 4;
+            spotLight.penumbra = 0.1;
+            spotLight.decay = 2;
+            spotLight.distance = 50;
+            scene.add(spotLight);
+
+            // Raycaster for mouse interaction
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            // Create retro elements
+            createRetroParticles();
+            createRetroGrid();
+            createImageFrames();
+
+            // Event listeners
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mousedown', onMouseDown);
+            window.addEventListener('mouseup', onMouseUp);
+            window.addEventListener('click', onClick);
+            window.addEventListener('wheel', onMouseWheel, { passive: false });
+            document.getElementById('prev-arrow').addEventListener('click', showPreviousImage);
+            document.getElementById('next-arrow').addEventListener('click', showNextImage);
+
+            // Update camera position
+            updateCameraPosition();
+
+            // Hide loading
+            document.getElementById('loading').style.display = 'none';
+
+            animate();
+        }
+
+        function createRetroParticles() {
+            const particleCount = 2000;
+            geometryParticles = new THREE.BufferGeometry();
+            
+            const positions = [];
+            const colors = [];
+            const sizes = [];
+            
+            const colorPalette = [
+                new THREE.Color(0xffffff), // Cyan
+                new THREE.Color(0xff1493), // Pink
+                new THREE.Color(0x9d4edd), // Purple
+                new THREE.Color(0x00ff00), // Green
+                new THREE.Color(0xffff00)  // Yellow
+            ];
+
+            for (let i = 0; i < particleCount; i++) {
+                positions.push((Math.random() - 0.5) * 200);
+                positions.push((Math.random() - 0.5) * 200);
+                positions.push((Math.random() - 0.5) * 200);
+                
+                const color = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+                colors.push(color.r, color.g, color.b);
+                
+                sizes.push(Math.random() * 3 + 1);
+            }
+
+            geometryParticles.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometryParticles.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            geometryParticles.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
+
+            const materialParticles = new THREE.PointsMaterial({
+                size: 2,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.6,
+                blending: THREE.AdditiveBlending
+            });
+
+            particles = new THREE.Points(geometryParticles, materialParticles);
+            scene.add(particles);
+        }
+
+        function createRetroGrid() {
+            const gridGeometry = new THREE.PlaneGeometry(100, 100, 20, 20);
+            const gridMaterial = new THREE.MeshBasicMaterial({
+                color: 0x00ffff,
+                transparent: true,
+                opacity: 0.1,
+                wireframe: true
+            });
+            
+            retroGrid = new THREE.Mesh(gridGeometry, gridMaterial);
+            retroGrid.rotation.x = -Math.PI / 2;
+            retroGrid.position.y = -15;
+            scene.add(retroGrid);
+        }
+
+        function createImageFrames() {
+            const textureLoader = new THREE.TextureLoader();
+            
+            galleryPieces.forEach((piece, index) => {
+                const texture = textureLoader.load(piece.images[0], (tex) => {
+                    tex.needsUpdate = true;
+                });
+
+                const geometry = new THREE.PlaneGeometry(4, 4);
+                const material = new THREE.MeshPhongMaterial({
+                    map: texture,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.9
+                });
+
+                const frame = new THREE.Mesh(geometry, material);
+                frame.castShadow = true;
+                frame.receiveShadow = true;
+                
+                // Create a more 3D arrangement
+                const phi = Math.acos(-1 + (2 * index) / galleryPieces.length);
+                const theta = Math.sqrt(galleryPieces.length * Math.PI) * phi;
+                const radius = 12;
+                
+                frame.position.x = radius * Math.cos(theta) * Math.sin(phi);
+                frame.position.y = radius * Math.cos(phi) + (Math.random() - 0.5) * 6;
+                frame.position.z = radius * Math.sin(theta) * Math.sin(phi);
+                
+                // Look toward center
+                frame.lookAt(0, 0, 0);
+                frame.rotation.x += (Math.random() - 0.5) * 0.3;
+                frame.rotation.y += (Math.random() - 0.5) * 0.3;
+                
+                frame.userData = {
+                    piece: piece,
+                    originalPosition: frame.position.clone(),
+                    originalRotation: frame.rotation.clone(),
+                    floatOffset: Math.random() * Math.PI * 2
+                };
+
+                imageFrames.push(frame);
+                scene.add(frame);
+            });
+        }
+
+        function updateCameraPosition() {
+            camera.position.x = cameraRadius * Math.sin(cameraPhi) * Math.cos(cameraTheta);
+            camera.position.y = cameraRadius * Math.cos(cameraPhi);
+            camera.position.z = cameraRadius * Math.sin(cameraPhi) * Math.sin(cameraTheta);
+            camera.lookAt(cameraTarget);
+        }
+
+        function onMouseDown(event) {
+            isDragging = true;
+            document.body.classList.add('grabbing');
+            previousMousePosition = {
+                x: event.clientX,
+                y: event.clientY
+            };
+        }
+
+        function onMouseUp() {
+            isDragging = false;
+            document.body.classList.remove('grabbing');
+        }
+
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+          if (isDragging) {
+    const deltaMove = {
+        x: event.clientX - previousMousePosition.x,
+        y: event.clientY - previousMousePosition.y
+    };
+
+    targetTheta -= deltaMove.x * 0.01;
+    targetPhi += deltaMove.y * 0.01;
+
+    // 限制phi，防止翻转
+    targetPhi = Math.max(0.1, Math.min(Math.PI - 0.1, targetPhi));
+
+    previousMousePosition = {
+        x: event.clientX,
+        y: event.clientY
+    };
+}
+        }
+
+        function onMouseWheel(event) {
+            event.preventDefault();
+            
+            const delta = event.deltaY > 0 ? 1.2 : 0.8;
+            targetRadius *= delta;
+            targetRadius = Math.max(1, Math.min(50, targetRadius));
+        }
+
+        function onClick(event) {
+            if (event.target.classList.contains('nav-arrow') || isDragging) return;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(imageFrames);
+
+            if (intersects.length > 0 && !selectedFrame) {
+                selectFrame(intersects[0].object);
+            } else if (!intersects.length && selectedFrame) {
+                deselectFrame();
+            }
+        }
+
+        function selectFrame(frame) {
+            selectedFrame = frame;
+            currentImageIndex = 0;
+            isAnimating = true;
+
+            const piece = frame.userData.piece;
+            document.getElementById('piece-title').textContent = piece.title;
+            document.getElementById('piece-description').textContent = piece.description;
+            //document.getElementById('piece-info').classList.add('visible');
+
+            if (piece.images.length > 1) {
+                document.getElementById('prev-arrow').classList.add('visible');
+                document.getElementById('next-arrow').classList.add('visible');
+            }
+
+            const targetPosition = new THREE.Vector3(0, 0, 8);
+            const targetRotation = new THREE.Euler(0, 0, 0);
+
+            animateFrameTransform(frame, targetPosition, targetRotation, () => {
+                isAnimating = false;
+            });
+        }
+
+        function deselectFrame() {
+            if (!selectedFrame || isAnimating) return;
+            
+            isAnimating = true;
+
+            document.getElementById('piece-info').classList.remove('visible');
+            document.getElementById('prev-arrow').classList.remove('visible');
+            document.getElementById('next-arrow').classList.remove('visible');
+
+            animateFrameTransform(
+                selectedFrame,
+                selectedFrame.userData.originalPosition,
+                selectedFrame.userData.originalRotation,
+                () => {
+                    selectedFrame = null;
+                    isAnimating = false;
+                }
+            );
+        }
+
+        function animateFrameTransform(frame, targetPos, targetRot, onComplete) {
+            const duration = 1200;
+            const startPos = frame.position.clone();
+            const startRot = frame.rotation.clone();
+            const startTime = Date.now();
+
+            function updateTransform() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = easeInOutCubic(progress);
+
+                frame.position.lerpVectors(startPos, targetPos, eased);
+                frame.rotation.x = startRot.x + (targetRot.x - startRot.x) * eased;
+                frame.rotation.y = startRot.y + (targetRot.y - startRot.y) * eased;
+                frame.rotation.z = startRot.z + (targetRot.z - startRot.z) * eased;
+
+                if (progress < 1) {
+                    requestAnimationFrame(updateTransform);
+                } else if (onComplete) {
+                    onComplete();
+                }
+            }
+
+            updateTransform();
+        }
+
+        function showPreviousImage(event) {
+            event.stopPropagation();
+            if (!selectedFrame) return;
+            
+            const piece = selectedFrame.userData.piece;
+            currentImageIndex = (currentImageIndex - 1 + piece.images.length) % piece.images.length;
+            updateFrameTexture(selectedFrame, piece.images[currentImageIndex]);
+        }
+
+        function showNextImage(event) {
+            event.stopPropagation();
+            if (!selectedFrame) return;
+            
+            const piece = selectedFrame.userData.piece;
+            currentImageIndex = (currentImageIndex + 1) % piece.images.length;
+            updateFrameTexture(selectedFrame, piece.images[currentImageIndex]);
+        }
+
+        function updateFrameTexture(frame, imageUrl) {
+            const textureLoader = new THREE.TextureLoader();
+            textureLoader.load(imageUrl, (texture) => {
+                frame.material.map = texture;
+                frame.material.needsUpdate = true;
+            });
+        }
+
+        function toggleView() {
+            if (!selectedFrame) return;
+
+            if (viewMode === 'focused') {
+                // Switch to gallery view while keeping frame selected
+                viewMode = 'gallery';
+                document.getElementById('view-mode').textContent = 'Gallery View';
+                
+                // Move frame back to original position but keep it selected
+                animateFrameTransform(
+                    selectedFrame,
+                    selectedFrame.userData.originalPosition,
+                    selectedFrame.userData.originalRotation,
+                    () => {
+                        // Reset camera to gallery view
+                        targetRadius = 20;
+                        targetTheta = 0;
+                        targetPhi = Math.PI / 2;
+                    }
+                );
+            } else {
+                // Switch to focused view
+                viewMode = 'focused';
+                document.getElementById('view-mode').textContent = 'Focused View';
+                
+                // Move camera to face the frame and bring frame to center
+                targetTheta = Math.atan2(selectedFrame.userData.originalPosition.z, selectedFrame.userData.originalPosition.x);
+                targetPhi = Math.PI / 2;
+                targetRadius = 8;
+
+                const targetPosition = new THREE.Vector3(0, 0, 6);
+                const targetRotation = new THREE.Euler(0, Math.PI, 0);
+
+                animateFrameTransform(selectedFrame, targetPosition, targetRotation);
+            }
+        }
+
+        function onKeyDown(event) {
+            if (event.key === 't' || event.key === 'T') {
+                toggleView();
+            }
+        }
+
+        function easeInOutCubic(t) {
+            return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = Date.now() * 0.001;
+
+            // Smooth camera movement
+            cameraTheta += (targetTheta - cameraTheta) * 0.05;
+            cameraPhi += (targetPhi - cameraPhi) * 0.05;
+            cameraRadius += (targetRadius - cameraRadius) * 0.05;
+            
+            updateCameraPosition();
+
+            // Animate retro particles
+            if (particles) {
+                particles.rotation.x += 0.001;
+                particles.rotation.y += 0.002;
+                
+                const positions = particles.geometry.attributes.position.array;
+                for (let i = 0; i < positions.length; i += 3) {
+                    positions[i + 1] += Math.sin(time + i) * 0.01;
+                }
+                particles.geometry.attributes.position.needsUpdate = true;
+            }
+
+            // Animate retro grid
+            if (retroGrid) {
+                retroGrid.rotation.z += 0.002;
+            }
+
+            // Float animation for frames with glitch effects
+            imageFrames.forEach((frame, index) => {
+                if (frame !== selectedFrame) {
+                    frame.position.y = frame.userData.originalPosition.y + 
+                        Math.sin(time * 0.3 + frame.userData.floatOffset) * 0.15;
+                    frame.rotation.z = frame.userData.originalRotation.z + 
+                        Math.sin(time * 0.2 + frame.userData.floatOffset) * 0.02;
+                    
+                    // Random glitch effect for frames
+                    if (Math.random() < 0.002) {
+                        frame.material.opacity = 0.7 + Math.random() * 0.3;
+                        setTimeout(() => {
+                            frame.material.opacity = 1.0;
+                        }, 100);
+                    }
+                    
+                    // Subtle scale glitch
+                    if (Math.random() < 0.001) {
+                        const glitchScale = 0.95 + Math.random() * 0.1;
+                        frame.scale.setScalar(glitchScale);
+                        setTimeout(() => {
+                            frame.scale.setScalar(1.0);
+                        }, 50);
+                    }
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        // Initialize the gallery
+        init();
+    </script>
+</body>
+</html>
