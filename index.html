@@ -747,6 +747,24 @@ images: ["https://raw.githubusercontent.com/driftingmelon/cer/main/pictures/13-o
 
             renderer.render(scene, camera);
         }
+                // 触摸事件绑定
+        window.addEventListener('touchstart', (event) => {
+                if (event.touches.length === 1) {
+                    const touch = event.touches[0];
+                    onMouseDown({ clientX: touch.clientX, clientY: touch.clientY });
+            }
+        }, { passive: false });
+
+        window.addEventListener('touchmove', (event) => {
+            if (event.touches.length === 1) {
+                 const touch = event.touches[0];
+                 onMouseMove({ clientX: touch.clientX, clientY: touch.clientY });
+            }
+        }, { passive: false });
+
+        window.addEventListener('touchend', (event) => {
+            onMouseUp({});
+        }, { passive: false });
 
         // Initialize the gallery
         init();
